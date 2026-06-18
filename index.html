@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forecast Marketing — National Demand Signal Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E141B; --surface:#161E27; --surface-2:#1D2733; --hairline:#2A3743;
+    --text:#E9EEF3; --muted:#8696A6; --muted-dim:#5E6E7D;
+    --gold:#E8B23A; --gold-dim:#9c7a28;
+    --t-flood:#3D9BE0; --t-heavy_rain:#5BB0E8; --t-snow_ice:#86D2E6; --t-freeze_thaw:#9CC3DC;
+    --t-high_wind:#A284E0; --t-severe_storm:#C765B0; --t-hail:#48CABB; --t-heat:#F0734A; --t-tropical:#46B89C;
+    --sev-extreme:#E5484D; --sev-high:#F0734A; --sev-mod:#E8B23A; --sev-low:#6E8090;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:15px; line-height:1.5;
+    -webkit-font-smoothing:antialiased; min-height:100vh;
+    background-image:radial-gradient(circle at 12% -10%, rgba(61,155,224,.08), transparent 45%),
+                     radial-gradient(circle at 90% 0%, rgba(232,178,58,.06), transparent 40%);
+  }
+  .mono{font-family:"IBM Plex Mono",monospace}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+
+  header{border-bottom:1px solid var(--hairline);padding:26px 0 20px}
+  .masthead{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .brand{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:25px;letter-spacing:-.02em;
+    display:flex;align-items:center;gap:11px}
+  .brand .pulse{width:9px;height:9px;border-radius:50%;background:var(--gold);animation:beacon 2.4s infinite}
+  @keyframes beacon{0%{box-shadow:0 0 0 0 rgba(232,178,58,.5)}70%{box-shadow:0 0 0 9px rgba(232,178,58,0)}100%{box-shadow:0 0 0 0 rgba(232,178,58,0)}}
+  .tagline{color:var(--muted);font-size:13.5px;margin-top:5px;max-width:52ch}
+  .stamp{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted-dim);text-align:right;line-height:1.7}
+  .stamp .live{color:var(--gold);font-weight:600}
+
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 0 2px}
+  .seg{display:inline-flex;background:var(--bg);border:1px solid var(--hairline);border-radius:8px;padding:3px;gap:2px}
+  .seg button{background:none;border:none;color:var(--muted);font-family:"IBM Plex Sans",sans-serif;
+    font-size:13px;font-weight:500;padding:7px 13px;border-radius:6px;cursor:pointer;transition:all .15s;white-space:nowrap}
+  .seg button.on{background:var(--gold);color:#1a1206;font-weight:600}
+  .seg button:not(.on):hover{color:var(--text)}
+  .focus{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+  .fchip{background:var(--surface-2);border:1px solid var(--hairline);color:var(--muted);
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;padding:6px 11px;border-radius:6px;cursor:pointer;
+    transition:all .15s;letter-spacing:-.01em}
+  .fchip.on{color:var(--text);border-color:var(--muted);background:var(--surface)}
+  .fchip:hover{color:var(--text)}
+  .btn{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text);border-radius:7px;
+    font-family:"IBM Plex Sans",sans-serif;font-size:13px;font-weight:500;padding:8px 14px;cursor:pointer;transition:all .15s}
+  .btn:hover{border-color:var(--muted)}
+  .btn[disabled]{opacity:.5;cursor:wait}
+  .spinning .ico{display:inline-block;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .pulsebar{display:flex;margin:20px 0 6px;border:1px solid var(--hairline);border-radius:9px;overflow:hidden}
+  .pstat{flex:1;padding:13px 16px;border-right:1px solid var(--hairline);min-width:0}
+  .pstat:last-child{border-right:none}
+  .pstat .n{font-family:"Space Grotesk",sans-serif;font-size:25px;font-weight:600;line-height:1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pstat .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:5px}
+  .pstat.top .n{color:var(--gold);font-size:18px;margin-top:4px}
+  .pstat.alert .n{color:var(--sev-extreme)}
+  .pstat.runway .n{color:var(--gold)}
+
+  .feed{padding:14px 0 60px;display:flex;flex-direction:column;gap:13px}
+  .card{background:var(--surface);border:1px solid var(--hairline);border-radius:11px;
+    border-left:4px solid var(--tc,var(--gold));overflow:hidden;
+    opacity:0;transform:translateY(8px);animation:rise .5s cubic-bezier(.2,.7,.3,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .card-head{display:flex;align-items:flex-start;gap:13px;padding:15px 18px;cursor:pointer;user-select:none}
+  .card-head:hover{background:var(--surface-2)}
+  .rank{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:13px;color:var(--muted-dim);
+    min-width:26px;padding-top:3px}
+  .tdot{width:11px;height:11px;border-radius:50%;background:var(--tc);margin-top:5px;flex-shrink:0}
+  .tdot.live{animation:beacon2 1.8s infinite}
+  @keyframes beacon2{0%{box-shadow:0 0 0 0 var(--tc)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .ch-main{flex:1;min-width:0}
+  .ch-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .ch-label{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:16.5px;letter-spacing:-.01em}
+  .ch-state{color:var(--text);font-weight:500}
+  .badge{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;text-transform:uppercase;
+    letter-spacing:.05em;padding:3px 7px;border-radius:4px;border:1px solid currentColor}
+  .sev-Severe,.sev-Extreme{color:var(--sev-extreme)}
+  .sev-High{color:var(--sev-high)} .sev-Moderate,.sev-Moderate-High{color:var(--sev-mod)}
+  .sev-Minor,.sev-Unknown{color:var(--sev-low)}
+  .ch-meta{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .ch-meta .dot{color:var(--muted-dim)}
+  .ch-right{display:flex;align-items:center;gap:16px;flex-shrink:0}
+  .score{text-align:center;min-width:42px}
+  .score .sn{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:22px;line-height:1;color:var(--gold)}
+  .score .sl{font-size:9px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+  .score.hot .sn::after{content:"●";color:var(--sev-extreme);font-size:9px;vertical-align:super;margin-left:2px}
+  .chevron{color:var(--muted-dim);transition:transform .25s;font-size:13px}
+  .card.open .chevron{transform:rotate(180deg)}
+
+  .runway{width:120px}
+  .runway-track{height:5px;background:var(--surface-2);border-radius:3px;position:relative;border:1px solid var(--hairline)}
+  .runway-fill{position:absolute;top:0;bottom:0;left:0;border-radius:3px;background:linear-gradient(90deg,var(--sev-extreme),var(--gold))}
+  .runway-mark{position:absolute;top:50%;width:9px;height:9px;border-radius:50%;background:var(--text);transform:translate(-50%,-50%);border:2px solid var(--bg)}
+  .runway-cap{display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--muted-dim);margin-top:4px;text-transform:uppercase;letter-spacing:.04em}
+  .lead-tag{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;margin-top:6px;text-align:center}
+  .lead-now{color:var(--sev-extreme)} .lead-run{color:var(--gold)}
+
+  .detail{display:none;padding:2px 18px 20px 57px;border-top:1px solid var(--hairline)}
+  .card.open .detail{display:block}
+  .drow{padding:14px 0;border-bottom:1px solid var(--hairline)}
+  .drow:last-child{border-bottom:none}
+  .dlabel{font-family:"IBM Plex Mono",monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+  .demand-row{display:flex;gap:18px;flex-wrap:wrap}
+  .demand-col .when{font-size:11px;color:var(--muted-dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+  .tag{display:inline-block;background:var(--surface-2);border:1px solid var(--hairline);border-radius:5px;padding:3px 9px;font-size:12.5px;margin:0 5px 5px 0}
+  .areas{font-size:13px;color:#cdd7e0;line-height:1.7}
+  .targets a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--gold-dim);padding-bottom:1px}
+  .targets a:hover{border-bottom-color:var(--gold)}
+  .target-line{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:13.5px}
+  .target-line .arrow{color:var(--muted-dim)}
+  .audience{font-size:13.5px;color:#cdd7e0}
+  .hook{background:var(--surface-2);border:1px solid var(--hairline);border-left:3px solid var(--gold);border-radius:7px;padding:13px 15px;font-size:14.5px;font-style:italic;color:#f0e6cf;position:relative}
+  .copy-btn{position:absolute;top:9px;right:9px;background:var(--surface);border:1px solid var(--hairline);color:var(--muted);border-radius:5px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;padding:4px 8px;cursor:pointer;font-style:normal;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
+  .copy-btn:hover{color:var(--text);border-color:var(--muted)}
+  .copy-btn.done{color:#1a1206;background:var(--gold);border-color:var(--gold)}
+  .skel{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px}
+  .skel dt{color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+  .skel dd .h{color:var(--gold)}
+
+  .state-msg{text-align:center;padding:64px 20px;color:var(--muted)}
+  .state-msg .big{font-family:"Space Grotesk",sans-serif;font-size:19px;color:var(--text);margin-bottom:8px;font-weight:500}
+  .state-msg.err .big{color:var(--sev-extreme)}
+  footer{border-top:1px solid var(--hairline);padding:20px 0 40px;color:var(--muted-dim);font-size:12px;font-family:"IBM Plex Mono",monospace;line-height:1.7}
+
+  @media(max-width:640px){
+    .runway{display:none}
+    .stamp{text-align:left}
+    .masthead{flex-direction:column;gap:6px}
+    .pulsebar{flex-wrap:wrap}.pstat{flex:1 1 50%;min-width:50%}
+    .demand-row{flex-direction:column;gap:10px}
+    .detail{padding-left:18px}
+    .ch-right{gap:10px}
+  }
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.card{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="masthead">
+      <div>
+        <div class="brand"><span class="pulse"></span>FORECAST&nbsp;MARKETING</div>
+        <div class="tagline">Every live weather event in the country, ranked by how well it converts businesses into clients. No searching — the opportunities come to you.</div>
+      </div>
+      <div class="stamp" id="stamp">scanning the US…<br><span class="live">—</span></div>
+    </div>
+    <div class="controls">
+      <div class="seg" id="viewSeg">
+        <button data-view="all" class="on">All signals</button>
+        <button data-view="runway">Runway only ↑</button>
+      </div>
+      <div class="focus" id="focus"></div>
+      <button class="btn" id="refreshBtn"><span class="ico">↻</span> Refresh</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="pulse"></div>
+  <div class="feed" id="feed">
+    <div class="state-msg"><div class="big">Scanning the country…</div>Pulling every active weather alert nationwide and ranking by conversion potential.</div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    Data: U.S. National Weather Service national alert feed. One call, whole country. No tracking, no account, no keys.<br>
+    Conversion score weighs event type (ticket size + ease of sell), severity, urgency, and how many areas are affected. "Runway only" hides what's already active and shows what you can still get ahead of.
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   National scan + conversion scoring — validated in node.
+   ============================================================ */
+const getJSON=u=>fetch(u,{headers:{}}).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()});
+const NOW=new Date();
+
+const ST_NAME={AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",CT:"Connecticut",DE:"Delaware",FL:"Florida",GA:"Georgia",HI:"Hawaii",ID:"Idaho",IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",ME:"Maine",MD:"Maryland",MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",MS:"Mississippi",MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",NH:"New Hampshire",NJ:"New Jersey",NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",OH:"Ohio",OK:"Oklahoma",OR:"Oregon",PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",WA:"Washington",WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming",DC:"D.C.",PR:"Puerto Rico"};
+
+// event keyword -> [triggerType, baseWeight]. Only demand-converting events.
+const EVENT_RULES=[
+  ["tornado",["severe_storm",5.0]],
+  ["hurricane",["tropical",5.0]],["tropical storm",["tropical",5.0]],["storm surge",["tropical",4.5]],
+  ["flash flood",["flood",5.0]],
+  ["hail",["hail",5.0]],
+  ["severe thunderstorm",["severe_storm",4.5]],
+  ["ice storm",["snow_ice",4.5]],["blizzard",["snow_ice",4.5]],
+  ["winter storm",["snow_ice",4.0]],["lake effect snow",["snow_ice",4.0]],["winter weather",["snow_ice",3.0]],
+  ["high wind",["high_wind",4.0]],
+  ["flood",["flood",4.0]],
+  ["extreme heat",["heat",3.0]],["excessive heat",["heat",3.0]],
+  ["wind advisory",["high_wind",3.0]],
+  ["heat advisory",["heat",2.5]],
+  ["freeze",["freeze_thaw",3.0]],["frost",["freeze_thaw",2.5]],
+];
+function classify(event){ const e=(event||"").toLowerCase(); for(const [k,v] of EVENT_RULES) if(e.includes(k)) return v; return null; }
+const SEV_M={Extreme:1.5,Severe:1.25,Moderate:1.0,Minor:0.7,Unknown:0.9};
+const URG_M={Immediate:1.25,Expected:1.1,Future:1.0,Past:0.5,Unknown:1.0};
+const SEV_RANK={Extreme:4,Severe:3,Moderate:2,Minor:1,Unknown:0};
+function daysFromNow(iso){ if(!iso) return 0; const d=new Date(iso); return Math.max(0,Math.round((d-NOW)/86400000)); }
+
+async function scanNation(){
+  const feats=(await getJSON("https://api.weather.gov/alerts/active?severity=Extreme,Severe,Moderate")).features;
+  const groups={};
+  for(const f of feats){
+    const p=f.properties; const cls=classify(p.event); if(!cls) continue;
+    const [type,weight]=cls;
+    const states=[...new Set((p.geocode&&p.geocode.UGC||[]).map(u=>u.slice(0,2)))].filter(s=>ST_NAME[s]);
+    const isWatch=/watch/i.test(p.event||"");
+    const lead=daysFromNow(p.onset||p.effective);
+    const areas=(p.areaDesc||"").split(";").map(a=>a.trim()).filter(Boolean);
+    for(const st of states){
+      const key=type+"|"+st;
+      const g=groups[key]||(groups[key]={type,st,weight,alerts:0,areas:new Set(),sev:"Unknown",urg:"Unknown",lead:0,active:false,events:new Set()});
+      g.alerts++; if(p.event) g.events.add(p.event);
+      areas.forEach(a=>g.areas.add(a));
+      if(SEV_RANK[p.severity]>SEV_RANK[g.sev]) g.sev=p.severity;
+      if((URG_M[p.urgency]||0)>(URG_M[g.urg]||0)) g.urg=p.urgency;
+      if(isWatch||lead>0) g.lead=Math.max(g.lead,lead||1); else g.active=true;
+    }
+  }
+  return Object.values(groups).map(g=>{
+    const areaN=g.areas.size;
+    const breadth=1+Math.min(0.5,(areaN-1)*0.015);
+    const raw=g.weight*(SEV_M[g.sev]||1)*(URG_M[g.urg]||1)*breadth;
+    const score=Math.min(100,Math.round(raw/12*100));
+    return {type:g.type,st:g.st,areaN,areaList:[...g.areas],sev:g.sev,events:[...g.events],
+            lead:g.lead,score,status:g.active?"active":"runway"};
+  }).sort((a,b)=>b.score-a.score);
+}
+
+/* ============================================================
+   Demand mapping — the reasoning layer
+   ============================================================ */
+const DEMAND_MAP={
+ freeze_thaw:{label:"Freeze-thaw",
+  demand:{immediate:["ice dam removal","emergency roof leak repair","gutter clearing"],lag:["interior water damage / restoration"],ongoing:["roof inspection & replacement"]},
+  targets:["roofing contractor","gutter installation","water damage restoration"],
+  audience:"Homeowners 35–65, homeownership + home-improvement signals. Angle: pre-emptive (“get ahead of the freeze”) beats reactive.",
+  hook:"There's a freeze-thaw swing hitting {area} {when} — the kind that causes ice dams. I can have a campaign live in those ZIPs before your competitors notice. Want to see what I'd run?",
+  campaign:{headline:"Ice dams forming this week? We're booking emergency roof checks now.",offer:"Free roof/gutter inspection",budget:"$40–75/day for 5 days",golive:"1–2 days before the freeze"}},
+ flood:{label:"Flooding",
+  demand:{immediate:["water extraction","emergency restoration","sump pump service"],lag:["mold remediation","basement waterproofing","dehumidifier rental"],ongoing:["foundation repair","flood-proofing"]},
+  targets:["water damage restoration","basement waterproofing","mold remediation"],
+  audience:"Homeowners in affected areas, especially older housing / basements. Angle: speed + 24/7 availability. Urgency is real — reactive copy works.",
+  hook:"{area} is under flood conditions {when}. Restoration demand spikes for ~72 hours and homeowners pick whoever shows up first in their feed. I can get you in front of them today.",
+  campaign:{headline:"Water in your basement? 24/7 emergency extraction — same-day response.",offer:"Free damage assessment, same-day response",budget:"$75–150/day while active",golive:"Immediately"}},
+ heavy_rain:{label:"Heavy rain",
+  demand:{immediate:["roof leak repair","gutter cleaning","drainage service"],lag:["water damage restoration","mold remediation"],ongoing:["roof replacement","waterproofing"]},
+  targets:["roofing contractor","gutter cleaning","water damage restoration"],
+  audience:"Homeowners in affected areas. Angle: leaks expose aging roofs — capture the “finally deal with my roof” moment.",
+  hook:"Heavy rain is forecast for {area} {when}. That's when leaks show up and homeowners start searching. I can have your roof/gutter campaign live before it hits.",
+  campaign:{headline:"Roof leaking when it rains? Book a free inspection before the next storm.",offer:"Free leak inspection",budget:"$40–60/day for 4 days",golive:"1 day before the rain"}},
+ snow_ice:{label:"Snow / ice",
+  demand:{immediate:["snow removal","plowing","roof snow-load clearing","ice dam removal"],lag:["roof leak repair","water damage restoration"],ongoing:["roof replacement","gutter guards"]},
+  targets:["snow removal service","roofing contractor","gutter installation"],
+  audience:"Homeowners + property managers in affected areas. Angle: book BEFORE the storm; capacity sells out. Property managers are a high-value second segment.",
+  hook:"A snow/ice event is headed for {area} {when}. Snow-removal and roof-clearing slots fill up fast — I can have you booking jobs before the first flake.",
+  campaign:{headline:"Snow coming {when}? Reserve your driveway & roof clearing now — slots filling.",offer:"Pre-book your spot / seasonal contract",budget:"$50–90/day for 3–4 days",golive:"2–3 days before the storm"}},
+ high_wind:{label:"High wind",
+  demand:{immediate:["tree removal","emergency roof repair","fence repair","tarping"],lag:["roof replacement","siding repair","gutter repair"],ongoing:["tree trimming","storm-proofing"]},
+  targets:["tree removal service","roofing contractor","fence repair"],
+  audience:"Homeowners in affected areas with mature trees / older roofs. Angle: damage is immediate and visible — be the first responder in their feed.",
+  hook:"High winds are forecast for {area} {when}. Expect downed limbs and lifted shingles — and a rush of homeowners searching for help. I can get you positioned before it hits.",
+  campaign:{headline:"Storm damage? Emergency tree & roof repair — fast response in {area}.",offer:"Free estimate, emergency response",budget:"$50–100/day for 3 days",golive:"1 day before, through the aftermath"}},
+ severe_storm:{label:"Severe storm",
+  demand:{immediate:["emergency roof repair","tree removal","generator service","tarping"],lag:["roof replacement","water damage restoration","siding repair"],ongoing:["backup generator install","storm-proofing"]},
+  targets:["roofing contractor","tree removal service","generator installation"],
+  audience:"Homeowners in affected areas. Angle: power loss + roof/tree damage. Generators and emergency repair both spike. Reactive copy converts in the aftermath window.",
+  hook:"Severe storms are hitting {area} {when}. Roof damage, downed trees, and power outages drive a 48-hour demand spike. I can have your emergency campaign live before it lands.",
+  campaign:{headline:"Storm just hit? Emergency roof & tree service — same-day response in {area}.",offer:"Free damage assessment",budget:"$60–120/day during and after",golive:"Same day"}},
+ hail:{label:"Hail",
+  demand:{immediate:["roof inspection","auto hail repair","gutter repair"],lag:["roof replacement","insurance claim assistance","siding repair"],ongoing:["impact-resistant roofing"]},
+  targets:["roofing contractor","auto hail repair","paintless dent repair"],
+  audience:"Homeowners + vehicle owners in affected areas. Angle: insurance-claim assistance is the killer offer — hail damage is often fully covered.",
+  hook:"Hail is in the forecast for {area} {when}. Hail roof claims are usually insurance-covered, which makes “free inspection + we handle the claim” a very easy sell. Want it live?",
+  campaign:{headline:"Hail damage? Free inspection — we handle the insurance claim for you.",offer:"Free inspection + claim assistance",budget:"$50–100/day for 4 days",golive:"Day of / day after"}},
+ heat:{label:"Heat wave",
+  demand:{immediate:["AC repair","HVAC service","emergency cooling"],lag:["HVAC replacement","attic insulation","duct sealing"],ongoing:["maintenance plans","smart-thermostat install"]},
+  targets:["HVAC repair","air conditioning service","attic insulation"],
+  audience:"Homeowners in affected areas, especially older AC systems. Angle: “beat the rush” — AC techs book solid in heat waves; emphasize availability.",
+  hook:"A heat wave is hitting {area} {when}. AC repair demand spikes and techs book out within a day. I can have your campaign live so you capture the calls before you're slammed.",
+  campaign:{headline:"AC struggling in this heat? Same-day repair — book before we're booked solid.",offer:"Same-day service, free diagnostic with repair",budget:"$50–90/day during the heat wave",golive:"1 day before peak heat"}},
+ tropical:{label:"Tropical storm / hurricane",
+  demand:{immediate:["board-up service","generator service","tree removal","emergency tarping"],lag:["roof replacement","water damage restoration","fence & siding repair"],ongoing:["backup generator install","impact windows","storm-proofing"]},
+  targets:["roofing contractor","generator installation","water damage restoration"],
+  audience:"Homeowners in affected areas. Angle: a clear prep window before, then a large restoration spike after. Generators, board-up, and roofing all surge. High-ticket, often insurance-backed.",
+  hook:"A tropical system is heading for {area} {when}. There's a prep-now window (board-up, generators) and a big restoration wave after. I can run the pre-storm campaign today and have the aftermath one ready to flip live.",
+  campaign:{headline:"Storm prep in {area}: book board-up, generators & roof checks now.",offer:"Free pre-storm inspection / priority scheduling",budget:"$80–150/day before and after",golive:"As soon as the watch is posted"}},
+};
+
+/* ============================================================
+   Filters / view state
+   ============================================================ */
+const FOCUS={
+  all:{label:"All verticals",types:null},
+  storm:{label:"Storm & roof",types:["severe_storm","high_wind","hail","tropical"]},
+  water:{label:"Water & flood",types:["flood","heavy_rain"]},
+  heat:{label:"Heat & HVAC",types:["heat"]},
+  winter:{label:"Winter",types:["snow_ice","freeze_thaw"]},
+};
+let view="all", focus="all", DATA=[];
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=(s,area,when)=>s.replace(/\{area\}/g,area).replace(/\{when\}/g,when);
+const mapsURL=(t,a)=>`https://www.google.com/maps/search/${encodeURIComponent(t+" near "+a)}`;
+
+function whenText(g){
+  if(g.status==="active") return "right now";
+  if(g.lead<=1) return "in the next day or so";
+  return `in about ${g.lead} days`;
+}
+function areaText(g){
+  if(g.areaN<=2 && g.areaList[0]) return `${g.areaList[0]}, ${g.st}`;
+  return ST_NAME[g.st]||g.st;
+}
+function mapsArea(g){ return g.areaList[0] ? `${g.areaList[0]}, ${g.st}` : (ST_NAME[g.st]||g.st); }
+
+function runwayWidget(g){
+  if(g.status==="active"){
+    return `<div class="runway"><div class="runway-track"><div class="runway-fill" style="width:4%"></div>
+      <div class="runway-mark" style="left:4%"></div></div>
+      <div class="runway-cap"><span>now</span><span>7d</span></div></div>
+      <div class="lead-tag lead-now">● ACTIVE NOW</div>`;
+  }
+  const frac=Math.min(g.lead,7)/7;
+  return `<div class="runway"><div class="runway-track"><div class="runway-fill" style="width:${frac*100}%"></div>
+    <div class="runway-mark" style="left:${frac*100}%"></div></div>
+    <div class="runway-cap"><span>now</span><span>7d</span></div></div>
+    <div class="lead-tag lead-run">${g.lead}-DAY RUNWAY</div>`;
+}
+
+let cardSeq=0;
+function renderCard(g,rank){
+  const m=DEMAND_MAP[g.type]; if(!m) return "";
+  const area=areaText(g), when=whenText(g);
+  const live=g.status==="active";
+  const delay=(cardSeq++ *0.04).toFixed(2);
+  const d=m.demand;
+  const col=(lbl,arr)=>`<div class="demand-col"><div class="when">${lbl}</div><div>${arr.map(x=>`<span class="tag">${esc(x)}</span>`).join("")}</div></div>`;
+  const targets=m.targets.map(tg=>`<div class="target-line targets"><span class="arrow">→</span><a href="${mapsURL(tg,mapsArea(g))}" target="_blank" rel="noopener">${esc(tg)}</a></div>`).join("");
+  const hookText=fmt(m.hook,area,when);
+  const c=m.campaign;
+  const areasShown=g.areaList.slice(0,8).map(esc).join(" · ")+(g.areaN>8?` · +${g.areaN-8} more`:"");
+  const evList=g.events.slice(0,3).map(esc).join(", ");
+  return `<div class="card" style="--tc:var(--t-${g.type});animation-delay:${delay}s">
+    <div class="card-head" onclick="this.parentNode.classList.toggle('open')">
+      <span class="rank">#${rank}</span>
+      <span class="tdot ${live?'live':''}"></span>
+      <div class="ch-main">
+        <div class="ch-top">
+          <span class="ch-label">${esc(m.label)}</span><span class="ch-state">— ${esc(ST_NAME[g.st]||g.st)}</span>
+          <span class="badge sev-${esc(g.sev)}">${esc(g.sev)}</span>
+        </div>
+        <div class="ch-meta">
+          <span>${g.areaN} area${g.areaN>1?"s":""} affected</span><span class="dot">·</span>
+          <span class="mono">${esc(evList)}</span>
+        </div>
+      </div>
+      <div class="ch-right">
+        ${runwayWidget(g)}
+        <div class="score ${g.score>=85?'hot':''}"><div class="sn">${g.score}</div><div class="sl">conv</div></div>
+        <span class="chevron">▾</span>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="drow"><div class="dlabel">Demand created</div><div class="demand-row">${col("Immediate",d.immediate)}${col("48–72h lag",d.lag)}${col("Ongoing",d.ongoing)}</div></div>
+      <div class="drow"><div class="dlabel">Affected areas — your ad geo-targeting</div><div class="areas">${areasShown}</div></div>
+      <div class="drow"><div class="dlabel">Pitch targets — your clients (best first call: owner-operators already running ads)</div>${targets}</div>
+      <div class="drow"><div class="dlabel">Their ad audience</div><div class="audience">${esc(m.audience)}</div></div>
+      <div class="drow"><div class="dlabel">Pitch hook</div><div class="hook">“${esc(hookText)}”<button class="copy-btn" data-hook="${esc(hookText)}">Copy</button></div></div>
+      <div class="drow"><div class="dlabel">Campaign skeleton</div><dl class="skel">
+        <dt>Headline</dt><dd class="h">${esc(fmt(c.headline,area,when))}</dd>
+        <dt>Offer</dt><dd>${esc(c.offer)}</dd><dt>Budget</dt><dd>${esc(c.budget)}</dd><dt>Go-live</dt><dd>${esc(c.golive)}</dd>
+      </dl></div>
+    </div>
+  </div>`;
+}
+
+function applyFilters(){
+  let rows=DATA.slice();
+  if(view==="runway") rows=rows.filter(g=>g.status==="runway");
+  const ft=FOCUS[focus].types;
+  if(ft) rows=rows.filter(g=>ft.includes(g.type));
+  return rows;
+}
+
+function renderPulse(){
+  const active=DATA.filter(g=>g.status==="active").length;
+  const runway=DATA.filter(g=>g.status==="runway").length;
+  const states=new Set(DATA.map(g=>g.st)).size;
+  const top=DATA[0];
+  const topTxt=top?`${DEMAND_MAP[top.type].label} · ${ST_NAME[top.st]||top.st}`:"—";
+  document.getElementById("pulse").innerHTML=`<div class="pulsebar">
+    <div class="pstat top"><div class="n" title="${esc(topTxt)}">${esc(topTxt)}</div><div class="l">Top opportunity (${top?top.score:0})</div></div>
+    <div class="pstat alert"><div class="n">${active}</div><div class="l">Active now</div></div>
+    <div class="pstat runway"><div class="n">${runway}</div><div class="l">With runway</div></div>
+    <div class="pstat"><div class="n">${states}</div><div class="l">States in play</div></div>
+  </div>`;
+}
+
+function renderFeed(){
+  const feed=document.getElementById("feed");
+  cardSeq=0;
+  const rows=applyFilters();
+  if(!DATA.length){ feed.innerHTML=`<div class="state-msg"><div class="big">All quiet nationwide.</div>No demand-converting weather events active right now. Rare, but it happens — check back later.</div>`; return; }
+  if(!rows.length){
+    const msg = view==="runway"
+      ? "Nothing with runway right now — every live signal is already active. Switch to “All signals” to see what's happening now."
+      : "No events match this focus right now. Try “All verticals.”";
+    feed.innerHTML=`<div class="state-msg"><div class="big">Nothing here at the moment.</div>${msg}</div>`; return;
+  }
+  feed.innerHTML=rows.map((g,i)=>renderCard(g,i+1)).join("");
+  document.querySelectorAll(".copy-btn").forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    navigator.clipboard.writeText(b.dataset.hook).then(()=>{ b.textContent="Copied"; b.classList.add("done");
+      setTimeout(()=>{ b.textContent="Copy"; b.classList.remove("done"); },1400); });
+  });
+}
+
+function renderFocusChips(){
+  document.getElementById("focus").innerHTML=Object.entries(FOCUS)
+    .map(([k,v])=>`<button class="fchip ${k===focus?'on':''}" data-f="${k}">${esc(v.label)}</button>`).join("");
+  document.querySelectorAll(".fchip").forEach(b=>b.onclick=()=>{ focus=b.dataset.f; renderFocusChips(); renderFeed(); });
+}
+
+/* ============================================================
+   Orchestration
+   ============================================================ */
+let busy=false;
+async function refresh(){
+  if(busy) return; busy=true;
+  const btn=document.getElementById("refreshBtn"); btn.disabled=true; btn.classList.add("spinning");
+  document.getElementById("feed").innerHTML=`<div class="state-msg"><div class="big">Scanning the country…</div>Pulling every active alert nationwide and ranking by conversion potential.</div>`;
+  try{
+    DATA=await scanNation();
+    renderPulse(); renderFeed();
+    const stamp=new Date().toLocaleString("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+    document.getElementById("stamp").innerHTML=`national scan as of<br><span class="live">${stamp}</span>`;
+  }catch(e){
+    document.getElementById("feed").innerHTML=`<div class="state-msg err"><div class="big">Couldn't reach the weather service.</div>${esc(e.message)}. Try Refresh in a moment — the NWS feed occasionally rate-limits.</div>`;
+    document.getElementById("pulse").innerHTML="";
+  }
+  btn.disabled=false; btn.classList.remove("spinning"); busy=false;
+}
+
+document.querySelectorAll("#viewSeg button").forEach(b=>b.onclick=()=>{
+  view=b.dataset.view;
+  document.querySelectorAll("#viewSeg button").forEach(x=>x.classList.toggle("on",x===b));
+  renderFeed();
+});
+document.getElementById("refreshBtn").onclick=refresh;
+
+renderFocusChips();
+refresh();
+</script>
+</body>
+</html>
