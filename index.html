@@ -220,12 +220,21 @@ async function scanNation(){
     const states=[...new Set((p.geocode&&p.geocode.UGC||[]).map(u=>u.slice(0,2)))].filter(s=>ST_NAME[s]);
     const isWatch=/watch/i.test(p.event||"");
     const lead=daysFromNow(p.onset||p.effective);
-    const areas=(p.areaDesc||"").split(";").map(a=>a.trim()).filter(Boolean);
+    // Attribute each affected county to its own state. Multi-state alerts tag
+    // every entry as "County, ST"; single-state alerts list bare county names.
+    const allAreas=(p.areaDesc||"").split(";").map(a=>a.trim()).filter(Boolean);
+    const single=states.length===1;
+    const areasByState={};
+    for(const a of allAreas){
+      const m=a.match(/,\s*([A-Z]{2})$/);
+      const ast=(m&&ST_NAME[m[1]])?m[1]:(single?states[0]:null);
+      if(ast) (areasByState[ast]=areasByState[ast]||[]).push(a);
+    }
     for(const st of states){
       const key=type+"|"+st;
       const g=groups[key]||(groups[key]={type,st,weight,alerts:0,areas:new Set(),sev:"Unknown",urg:"Unknown",lead:0,active:false,events:new Set()});
       g.alerts++; if(p.event) g.events.add(p.event);
-      areas.forEach(a=>g.areas.add(a));
+      (areasByState[st]||[]).forEach(a=>g.areas.add(a));
       if(SEV_RANK[p.severity]>SEV_RANK[g.sev]) g.sev=p.severity;
       if((URG_M[p.urgency]||0)>(URG_M[g.urg]||0)) g.urg=p.urgency;
       if(isWatch||lead>0) g.lead=Math.max(g.lead,lead||1); else g.active=true;
@@ -233,7 +242,7 @@ async function scanNation(){
   }
   return Object.values(groups).map(g=>{
     const areaN=g.areas.size;
-    const breadth=1+Math.min(0.5,(areaN-1)*0.015);
+    const breadth=1+Math.min(0.5,(Math.max(areaN,1)-1)*0.015);
     const raw=g.weight*(SEV_M[g.sev]||1)*(URG_M[g.urg]||1)*breadth;
     const score=Math.min(100,Math.round(raw/12*100));
     return {type:g.type,st:g.st,areaN,areaList:[...g.areas],sev:g.sev,events:[...g.events],
@@ -356,7 +365,7 @@ function renderCard(g,rank){
   const targets=m.targets.map(tg=>`<div class="target-line targets"><span class="arrow">→</span><a href="${mapsURL(tg,mapsArea(g))}" target="_blank" rel="noopener">${esc(tg)}</a></div>`).join("");
   const hookText=fmt(m.hook,area,when);
   const c=m.campaign;
-  const areasShown=g.areaList.slice(0,8).map(esc).join(" · ")+(g.areaN>8?` · +${g.areaN-8} more`:"");
+  const areasShown=g.areaList.length ? g.areaList.slice(0,8).map(esc).join(" · ")+(g.areaN>8?` · +${g.areaN-8} more`:"") : `Statewide — ${esc(ST_NAME[g.st]||g.st)}`;
   const evList=g.events.slice(0,3).map(esc).join(", ");
   return `<div class="card" style="--tc:var(--t-${g.type});animation-delay:${delay}s">
     <div class="card-head" onclick="this.parentNode.classList.toggle('open')">
@@ -368,7 +377,7 @@ function renderCard(g,rank){
           <span class="badge sev-${esc(g.sev)}">${esc(g.sev)}</span>
         </div>
         <div class="ch-meta">
-          <span>${g.areaN} area${g.areaN>1?"s":""} affected</span><span class="dot">·</span>
+          <span>${g.areaN>0?`${g.areaN} area${g.areaN>1?"s":""} affected`:"statewide"}</span><span class="dot">·</span>
           <span class="mono">${esc(evList)}</span>
         </div>
       </div>
